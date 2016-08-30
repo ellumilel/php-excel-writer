@@ -1,24 +1,26 @@
 {
-    "name": "dtihonov/xlsx-writer",
+    "name": "ellumilel/php-excel-writer",
     "description": "Big data Excel writer",
-    "keywords": ["excel", "export", "xlsx", "spreadsheet"],
-    "homepage": "https://github.com/Ellumilel/xlsxWriter",
+    "keywords": ["excel-writer", "excel", "export", "xlsx", "spreadsheet", "php-excel", "big-data"],
+    "homepage": "https://github.com/Ellumilel/php-excel-writer",
     "license": "MIT",
     "authors": [
         {
             "name": "Denis Tikhonov",
             "email": "ozy@mailserver.ru",
-            "homepage": "https://github.com/Ellumilel/xlsxWriter",
+            "homepage": "https://github.com/Ellumilel/php-excel-writer",
             "role": "Author"
         }
     ],
     "require-dev": {
-        "phpunit/phpunit": "~4.0"
+        "phpunit/phpunit": "~4.0",
+        "squizlabs/php_codesniffer": "~2.0"
     },
     "require": {
         "php": "^5.4|^7.0"
     },
     "autoload": {
-        "psr-4": { "xlsxWriter\\": "src/" }
-    }
+        "psr-4": { "Ellumilel\\": "src/" }
+    },
+    "minimum-stability": "dev"
 }

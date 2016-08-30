@@ -1,5 +1,5 @@
 <?php
-namespace xlsxWriter;
+namespace Ellumilel;
 
 /**
  * Class Writer

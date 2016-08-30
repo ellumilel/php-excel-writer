@@ -1,6 +1,11 @@
 <?php
-namespace xlsxWriter;
+namespace Ellumilel;
 
+/**
+ * Class Sheet
+ * @package Ellumilel
+ * @author Denis Tikhonov <ozy@mailserver.ru>
+ */
 class Sheet
 {
     /** @var string */
@@ -141,7 +146,7 @@ class Sheet
     }
 
     /**
-     * @param array $column
+     * @param int $column
      *
      * @return $this
      */
@@ -173,13 +178,13 @@ class Sheet
     }
 
     /**
-     * @param array $mergeCells
+     * @param string $mergeCells
      *
      * @return $this
      */
-    public function setMergeCells(array $mergeCells)
+    public function setMergeCells($mergeCells)
     {
-        $this->mergeCells = $mergeCells;
+        $this->mergeCells[] = $mergeCells;
 
         return $this;
     }

@@ -1,9 +1,15 @@
 <?php
-namespace xlsxWriter;
+namespace Ellumilel;
+
+use Ellumilel\DocProps\App;
+use Ellumilel\DocProps\Core;
+use Ellumilel\Rels\Relationships;
+use Ellumilel\Xl\SharedStrings;
 
 /**
  * Class ExcelWriter
- * @package xlsxWriter
+ * @package Ellumilel
+ * @author Denis Tikhonov <ozy@mailserver.ru>
  */
 class ExcelWriter
 {
@@ -11,10 +17,11 @@ class ExcelWriter
      * @link http://office.microsoft.com/en-us/excel-help/excel-specifications-and-limits-HP010073849.aspx
      */
     const EXCEL_MAX_ROW = 1048576;
+    const EXCEL_MAX_RANGE = 2147483647;
     const EXCEL_MAX_COL = 16384;
 
     /** @var string */
-    private $urlSchemaFormat = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    private $urlSchemaFormat = 'http://schemas.openxmlformats.org/officeDocument/2006';
 
     /** @var string */
     protected $author ='Unknown Author';
@@ -23,7 +30,7 @@ class ExcelWriter
     /** @var array */
     protected $sharedStrings = [];//unique set
     /** @var int */
-    protected $shared_string_count = 0;//count of non-unique references to the unique set
+    protected $sharedStringCount = 0;//count of non-unique references to the unique set
     /** @var array */
     protected $tempFiles = [];
     /** @var array */
@@ -64,7 +71,9 @@ class ExcelWriter
     {
         if (!empty($this->tempFiles)) {
             foreach ($this->tempFiles as $tempFile) {
-                @unlink($tempFile);
+                if (file_exists($tempFile)) {
+                    unlink($tempFile);
+                }
             }
         }
     }
@@ -115,33 +124,32 @@ class ExcelWriter
     public function writeToFile($filename)
     {
         foreach ($this->sheets as $sheetName => $sheet) {
-            self::finalizeSheet($sheetName);//making sure all footers have been written
+            $this->finalizeSheet($sheetName);//making sure all footers have been written
         }
-        if (file_exists($filename)) {
-            if (is_writable($filename)) {
-                @unlink($filename); //if the zip already exists, remove it
-            } else {
-                self::log("Error in ".__CLASS__."::".__FUNCTION__.", file is not writeable.");
+        if (file_exists($filename) && is_writable($filename)) {
+            unlink($filename);
+        }
 
-                return;
-            }
-        }
         $zip = new \ZipArchive();
-        if (empty($this->sheets)) {
-            self::log("Error in ".__CLASS__."::".__FUNCTION__.", no worksheets defined.");
-
+        if (empty($this->sheets) || !$zip->open($filename, \ZipArchive::CREATE)) {
+            self::log("Error in ".__CLASS__."::".__FUNCTION__.", no worksheets defined or unable to create zip.");
             return;
         }
-        if (!$zip->open($filename, \ZipArchive::CREATE)) {
-            self::log("Error in ".__CLASS__."::".__FUNCTION__.", unable to create zip.");
 
-            return;
-        }
+        $app = new App();
+        $core = new Core();
+
+        $contentTypes = new ContentTypes(!empty($this->sharedStrings));
+        $contentTypes->setSheet($this->sheets);
+
+        $rels = new Relationships(!empty($this->sharedStrings));
+        $rels->setSheet($this->sheets);
+
         $zip->addEmptyDir("docProps/");
-        $zip->addFromString("docProps/app.xml", self::buildAppXML());
-        $zip->addFromString("docProps/core.xml", self::buildCoreXML());
+        $zip->addFromString("docProps/app.xml", $app->buildAppXML());
+        $zip->addFromString("docProps/core.xml", $core->buildCoreXML());
         $zip->addEmptyDir("_rels/");
-        $zip->addFromString("_rels/.rels", self::buildRelationshipsXML());
+        $zip->addFromString("_rels/.rels", $rels->buildRelationshipsXML());
         $zip->addEmptyDir("xl/worksheets/");
         foreach ($this->sheets as $sheet) {
             /** @var Sheet $sheet */
@@ -151,16 +159,16 @@ class ExcelWriter
             $zip->addFile(
                 $this->writeSharedStringsXML(),
                 "xl/sharedStrings.xml"
-            );  //$zip->addFromString("xl/sharedStrings.xml",     self::buildSharedStringsXML() );
+            );
         }
         $zip->addFromString("xl/workbook.xml", self::buildWorkbookXML());
         $zip->addFile(
             $this->writeStylesXML(),
             "xl/styles.xml"
-        );  //$zip->addFromString("xl/styles.xml"           , self::buildStylesXML() );
-        $zip->addFromString("[Content_Types].xml", self::buildContentTypesXML());
+        );
+        $zip->addFromString("[Content_Types].xml", $contentTypes->buildContentTypesXML());
         $zip->addEmptyDir("xl/_rels/");
-        $zip->addFromString("xl/_rels/workbook.xml.rels", self::buildWorkbookRelXML());
+        $zip->addFromString("xl/_rels/workbook.xml.rels", $rels->buildWorkbookRelationshipsXML());
         $zip->close();
     }
 
@@ -169,7 +177,6 @@ class ExcelWriter
      */
     protected function initializeSheet($sheetName)
     {
-        //if already initialized
         if ($this->currentSheet == $sheetName || isset($this->sheets[$sheetName])) {
             return;
         }
@@ -183,18 +190,6 @@ class ExcelWriter
             ->setWriter(new Writer($sheetFilename))
         ;
         $this->sheets[$sheetName] = $sheetObj;
-        /*$this->sheets[$sheetName] = (object)[
-            'filename' => $sheetFilename,
-            'sheetname' => $sheetName,
-            'xmlname' => $sheetXmlName,
-            'row_count' => 0,
-            'file_writer' => new Writer($sheetFilename),
-            'columns' => [],
-            'merge_cells' => [],
-            'max_cell_tag_start' => 0,
-            'max_cell_tag_end' => 0,
-            'finalized' => false,
-        ];*/
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
         $selectedTab = count($this->sheets) == 1 ? 'true' : 'false';//only first sheet is selected
@@ -202,7 +197,7 @@ class ExcelWriter
         $sheet->getWriter()->write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'."\n");
         $sheet->getWriter()->write(
             '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" 
-                xmlns:r="'.$this->urlSchemaFormat.'">'
+                xmlns:r="'.$this->urlSchemaFormat.'/relationships">'
         );
         $sheet->getWriter()->write('<sheetPr filterMode="false">');
         $sheet->getWriter()->write('<pageSetUpPr fitToPage="false"/>');
@@ -269,6 +264,8 @@ class ExcelWriter
     }
 
     /**
+     * @todo  check escaping
+     *
      * @param $cellFormat
      *
      * @return string
@@ -301,17 +298,17 @@ class ExcelWriter
         }
 
         return $escaped;
-        //return str_replace( array(" ","-", "(", ")"), array("\ ","\-", "\(", "\)"), $cell_format);//TODO, needs more escaping
     }
 
     /**
+     * backwards compatibility
+     *
      * @param $cellFormat
      *
      * @return int|mixed
      */
     private function addCellFormat($cellFormat)
     {
-        //for backwards compatibility, to handle older versions
         switch ($cellFormat) {
             case 'string':
                 $cellFormat = 'GENERAL';
@@ -366,7 +363,7 @@ class ExcelWriter
         if (empty($sheetName) || empty($headerTypes) || !empty($this->sheets[$sheetName])) {
             return;
         }
-        self::initializeSheet($sheetName);
+        $this->initializeSheet($sheetName);
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
         $sheet->setColumns([]);
@@ -398,7 +395,7 @@ class ExcelWriter
         if (empty($sheetName) || empty($row)) {
             return;
         }
-        self::initializeSheet($sheetName);
+        $this->initializeSheet($sheetName);
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
         $columns = $sheet->getColumns();
@@ -487,7 +484,7 @@ class ExcelWriter
         if (empty($sheetName) || $this->sheets[$sheetName]->getFinalized()) {
             return;
         }
-        self::initializeSheet($sheetName);
+        $this->initializeSheet($sheetName);
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
         $startCell = self::xlsCell($startCellRow, $startCellColumn);
@@ -529,11 +526,11 @@ class ExcelWriter
     ) {
         $cellType = $this->cellTypes[$cellIndex];
         $cellName = self::xlsCell($rowNumber, $columnNumber);
-        if (!is_scalar($value) || $value === '') { //objects, array, empty
+        if (!is_scalar($value) || $value === '') {
             $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'"/>');
         } elseif (is_string($value) && $value{0} == '=') {
             $file->write(
-                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="s"><f>'.self::xmlspecialchars($value).'</f></c>'
+                sprintf('<c r="%s" s="%s" t="s"><f>%s</f></c>', $cellName, $cellIndex, self::xmlspecialchars($value))
             );
         } elseif ($cellType == 'date') {
             $file->write(
@@ -546,7 +543,7 @@ class ExcelWriter
         } elseif ($cellType == 'currency' || $cellType == 'percent' || $cellType == 'numeric') {
             $file->write(
                 '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.self::xmlspecialchars($value).'</v></c>'
-            );//int,float,currency
+            );
         } else {
             if (!is_string($value)) {
                 $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.($value * 1).'</v></c>');
@@ -554,10 +551,10 @@ class ExcelWriter
                 if ($value{0} != '0' && $value{0} != '+' && filter_var(
                     $value,
                     FILTER_VALIDATE_INT,
-                    ['options' => ['max_range' => 2147483647]]
+                    ['options' => ['max_range' => self::EXCEL_MAX_RANGE]]
                 )) {
                     $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.($value * 1).'</v></c>');
-                } else { //implied: ($cell_format=='string')
+                } else {
                     $file->write(
                         '<c r="'.$cellName.'" s="'.$cellIndex.'" t="s"><v>'.self::xmlspecialchars(
                             $this->setSharedString($value)
@@ -581,10 +578,6 @@ class ExcelWriter
         foreach ($this->cellFormats as $i => $v) {
             $file->write('<numFmt numFmtId="'.(164 + $i).'" formatCode="'.self::xmlspecialchars($v).'" />');
         }
-        //$file->write(		'<numFmt formatCode="GENERAL" numFmtId="164"/>');
-        //$file->write(		'<numFmt formatCode="[$$-1009]#,##0.00;[RED]\-[$$-1009]#,##0.00" numFmtId="165"/>');
-        //$file->write(		'<numFmt formatCode="YYYY-MM-DD\ HH:MM:SS" numFmtId="166"/>');
-        //$file->write(		'<numFmt formatCode="YYYY-MM-DD" numFmtId="167"/>');
         $file->write('</numFmts>');
         $file->write('<fonts count="4">');
         $file->write('<font><name val="Arial"/><charset val="1"/><family val="2"/><sz val="10"/></font>');
@@ -621,16 +614,12 @@ class ExcelWriter
         $file->write('</cellStyleXfs>');
         $file->write('<cellXfs count="'.count($this->cellFormats).'">');
         foreach ($this->cellFormats as $i => $v) {
-            $file->write('<xf applyAlignment="false" applyBorder="false" applyFont="false" 
-            applyProtection="false" borderId="0" fillId="0" fontId="0" numFmtId="'.(164+$i).'" xfId="0"/>');
+            $file->write(
+                '<xf applyAlignment="false" applyBorder="false" applyFont="false" 
+            applyProtection="false" borderId="0" fillId="0" fontId="0" numFmtId="'.(164 + $i).'" xfId="0"/>'
+            );
         }
         $file->write('</cellXfs>');
-        //$file->write(	'<cellXfs count="4">');
-        //$file->write('<xf applyAlignment="false" applyBorder="false" applyFont="false" applyProtection="false" borderId="0" fillId="0" fontId="0" numFmtId="164" xfId="0"/>');
-        //$file->write('<xf applyAlignment="false" applyBorder="false" applyFont="false" applyProtection="false" borderId="0" fillId="0" fontId="0" numFmtId="165" xfId="0"/>');
-        //$file->write('<xf applyAlignment="false" applyBorder="false" applyFont="false" applyProtection="false" borderId="0" fillId="0" fontId="0" numFmtId="166" xfId="0"/>');
-        //$file->write('<xf applyAlignment="false" applyBorder="false" applyFont="false" applyProtection="false" borderId="0" fillId="0" fontId="0" numFmtId="167" xfId="0"/>');
-        //$file->write(	'</cellXfs>');
         $file->write('<cellStyles count="6">');
         $file->write('<cellStyle builtinId="0" customBuiltin="false" name="Normal" xfId="0"/>');
         $file->write('<cellStyle builtinId="3" customBuiltin="false" name="Comma" xfId="15"/>');
@@ -657,7 +646,7 @@ class ExcelWriter
             $stringValue = count($this->sharedStrings);
             $this->sharedStrings[$v] = $stringValue;
         }
-        $this->shared_string_count++;//non-unique count
+        $this->sharedStringCount++;//non-unique count
 
         return $stringValue;
     }
@@ -667,72 +656,13 @@ class ExcelWriter
      */
     protected function writeSharedStringsXML()
     {
-        $temporaryFilename = $this->tempFilename();
-        $file = new Writer($temporaryFilename, $fd_flags = 'w', $check_utf8 = true);
-        $file->write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'."\n");
-        $file->write(
-            '<sst count="'.($this->shared_string_count).'" uniqueCount="'.count(
-                $this->sharedStrings
-            ).'" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        );
-        foreach ($this->sharedStrings as $s => $c) {
-            $file->write('<si><t>'.self::xmlspecialchars($s).'</t></si>');
-        }
-        $file->write('</sst>');
+        $tempFilename = $this->tempFilename();
+        $file = new Writer($tempFilename);
+        $sharedStrings = new SharedStrings($this->sharedStringCount, $this->sharedStrings);
+        $file->write($sharedStrings->buildSharedStringsXML());
         $file->close();
 
-        return $temporaryFilename;
-    }
-
-    /**
-     * @return string
-     */
-    protected function buildAppXML()
-    {
-        $app_xml="";
-        $app_xml.='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'."\n";
-        $app_xml.='<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
-                    xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-                    <TotalTime>0</TotalTime></Properties>'
-        ;
-        return $app_xml;
-    }
-
-    /**
-     * @return string
-     */
-    protected function buildCoreXML()
-    {
-        $core_xml = "";
-        $core_xml .= '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'."\n";
-        $core_xml .= '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">';
-        //$date_time = '2014-10-25T15:54:37.00Z';
-        $core_xml .= '<dcterms:created xsi:type="dcterms:W3CDTF">'.date("Y-m-d\TH:i:s.00\Z").'</dcterms:created>';
-        $core_xml .= '<dc:creator>'.self::xmlspecialchars($this->author).'</dc:creator>';
-        $core_xml .= '<cp:revision>0</cp:revision>';
-        $core_xml .= '</cp:coreProperties>';
-
-        return $core_xml;
-    }
-
-    /**
-     * @return string
-     */
-    protected function buildRelationshipsXML()
-    {
-        $relXml = "";
-        $relXml .= '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $relXml .= '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-        $relXml .= '<Relationship Id="rId1" Type="'.$this->urlSchemaFormat.'/officeDocument" 
-        Target="xl/workbook.xml"/>';
-        $relXml .= '<Relationship Id="rId2" Type="'.$this->urlSchemaFormat.'/metadata/core-properties" 
-        Target="docProps/core.xml"/>';
-        $relXml .= '<Relationship Id="rId3" Type="'.$this->urlSchemaFormat.'/extended-properties" 
-        Target="docProps/app.xml"/>';
-        $relXml .= "\n";
-        $relXml .= '</Relationships>';
-
-        return $relXml;
+        return $tempFilename;
     }
 
     /**
@@ -741,80 +671,26 @@ class ExcelWriter
     protected function buildWorkbookXML()
     {
         $i = 0;
-        $workbookXml = "";
+        $workbookXml = '';
         $workbookXml .= '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'."\n";
-        $workbookXml .= '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-                xmlns:r="'.$this->urlSchemaFormat.'">';
-        $workbookXml .= '<fileVersion appName="Calc"/><workbookPr backupFile="false" 
-                showObjects="all" date1904="false"/><workbookProtection/>';
-        $workbookXml .= '<bookViews><workbookView activeTab="0" firstSheet="0" showHorizontalScroll="true" 
-                showSheetTabs="true" showVerticalScroll="true" tabRatio="212" windowHeight="8192" windowWidth="16384" 
-                xWindow="0" yWindow="0"/></bookViews>';
+        $workbookXml .= '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+        $workbookXml .= ' xmlns:r="'.$this->urlSchemaFormat.'/relationships">';
+        $workbookXml .= '<fileVersion appName="Calc"/><workbookPr backupFile="false"';
+        $workbookXml .= ' showObjects="all" date1904="false"/><workbookProtection/>';
+        $workbookXml .= '<bookViews><workbookView activeTab="0" firstSheet="0" showHorizontalScroll="true"';
+        $workbookXml .= ' showSheetTabs="true" showVerticalScroll="true" tabRatio="212" windowHeight="8192"';
+        $workbookXml .= ' windowWidth="16384" xWindow="0" yWindow="0"/></bookViews>';
         $workbookXml .= '<sheets>';
         foreach ($this->sheets as $sheet_name => $sheet) {
             /** @var Sheet $sheet */
-            $workbookXml .= '<sheet name="'.self::xmlspecialchars($sheet->getSheetName()).'" 
-            sheetId="'.($i + 1).'" state="visible" r:id="rId'.($i + 2).'"/>';
+            $workbookXml .= '<sheet name="'.self::xmlspecialchars($sheet->getSheetName()).'"';
+            $workbookXml .= ' sheetId="'.($i + 1).'" state="visible" r:id="rId'.($i + 2).'"/>';
             $i++;
         }
         $workbookXml .= '</sheets>';
         $workbookXml .= '<calcPr iterateCount="100" refMode="A1" iterate="false" iterateDelta="0.001"/></workbook>';
 
         return $workbookXml;
-    }
-
-    /**
-     * @return string
-     */
-    protected function buildWorkbookRelXML()
-    {
-        $i = 0;
-        $relXml = '';
-        $relXml .= '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $relXml .= '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-        $relXml .= '<Relationship Id="rId1" Type="'.$this->urlSchemaFormat.'/styles" Target="styles.xml"/>';
-        foreach ($this->sheets as $sheet_name => $sheet) {
-            /** @var Sheet $sheet */
-            $relXml .= '<Relationship Id="rId'.($i + 2).'" 
-            Type="'.$this->urlSchemaFormat.'/worksheet" Target="worksheets/'.($sheet->getXmlName()).'"/>';
-            $i++;
-        }
-        if (!empty($this->sharedStrings)) {
-            $relXml .= '<Relationship Id="rId'.(count($this->sheets) + 2).'" 
-            Type="'.$this->urlSchemaFormat.'/sharedStrings" Target="sharedStrings.xml"/>';
-        }
-        $relXml .= "\n";
-        $relXml .= '</Relationships>';
-
-        return $relXml;
-    }
-
-    /**
-     * @return string
-     */
-    protected function buildContentTypesXML()
-    {
-        $contentTypeXml = "";
-        $contentTypeXml .= '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $contentTypeXml .= '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">';
-        $contentTypeXml .= '<Override PartName="/_rels/.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
-        $contentTypeXml .= '<Override PartName="/xl/_rels/workbook.xml.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
-        foreach ($this->sheets as $sheet_name => $sheet) {
-            /** @var Sheet $sheet */
-            $contentTypeXml .= '<Override PartName="/xl/worksheets/'.($sheet->getXmlName()).'" 
-            ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
-        }
-        if (!empty($this->sharedStrings)) {
-            $contentTypeXml .= '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>';
-        }
-        $contentTypeXml .= '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>';
-        $contentTypeXml .= '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
-        $contentTypeXml .= '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>';
-        $contentTypeXml .= '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>';
-        $contentTypeXml .= "\n";
-        $contentTypeXml .= '</Types>';
-
-        return $contentTypeXml;
     }
 
     /**
@@ -876,43 +752,45 @@ class ExcelWriter
      *
      * @return int
      */
-    public static function convertDateTime($dateInput) //thanks to Excel::Writer::XLSX::Worksheet.pm (perl)
+    public static function convertDateTime($dateInput)
     {
-        $days = 0;    # Number of days since epoch
-        $seconds = 0;    # Time expressed as fraction of 24h hours in seconds
+        // Time expressed as fraction of 24h hours in seconds
+        $seconds = 0;
         $year = $month = $day = 0;
-        $hour = $min = $sec = 0;
-        $date_time = $dateInput;
-        if (preg_match("/(\d{4})\-(\d{2})\-(\d{2})/", $date_time, $matches)) {
-            list($junk, $year, $month, $day) = $matches;
+        $dateTime = $dateInput;
+        if (preg_match("/(\d{4})\-(\d{2})\-(\d{2})/", $dateTime, $matches)) {
+            list($year, $month, $day) = $matches;
         }
-        if (preg_match("/(\d{2}):(\d{2}):(\d{2})/", $date_time, $matches)) {
-            list($junk, $hour, $min, $sec) = $matches;
+        if (preg_match("/(\d{2}):(\d{2}):(\d{2})/", $dateTime, $matches)) {
+            list($hour, $min, $sec) = $matches;
             $seconds = ($hour * 60 * 60 + $min * 60 + $sec) / (24 * 60 * 60);
         }
         //using 1900 as epoch, not 1904, ignoring 1904 special case
-        # Special cases for Excel.
+        // Special cases for Excel.
         if ("$year-$month-$day" == '1899-12-31') {
             return $seconds;
-        }    # Excel 1900 epoch
+        }    // Excel 1900 epoch
         if ("$year-$month-$day" == '1900-01-00') {
             return $seconds;
-        }    # Excel 1900 epoch
+        }    // Excel 1900 epoch
         if ("$year-$month-$day" == '1900-02-29') {
             return 60 + $seconds;
-        }    # Excel false leapday
-        # We calculate the date by calculating the number of days since the epoch
-        # and adjust for the number of leap days. We calculate the number of leap
-        # days by normalising the year in relation to the epoch. Thus the year 2000
-        # becomes 100 for 4 and 100 year leapdays and 400 for 400 year leapdays.
+        }
+        // Excel false leapday
+        /*
+         We calculate the date by calculating the number of days since the epoch
+         and adjust for the number of leap days. We calculate the number of leap
+         days by normalising the year in relation to the epoch. Thus the year 2000
+         becomes 100 for 4 and 100 year leapdays and 400 for 400 year leapdays.
+        */
         $epoch  = 1900;
         $offset = 0;
         $norm   = 300;
         $range  = $year - $epoch;
-        # Set month days and check for leap year.
+        // Set month days and check for leap year.
         $leap = (($year % 400 == 0) || (($year % 4 == 0) && ($year % 100)) ) ? 1 : 0;
         $mdays = array( 31, ($leap ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 );
-        # Some boundary checks
+        // Some boundary checks
         if ($year < $epoch || $year > 9999) {
             return 0;
         }
@@ -922,15 +800,22 @@ class ExcelWriter
         if ($day < 1 || $day > $mdays[$month - 1]) {
             return 0;
         }
-        # Accumulate the number of days since the epoch.
-        $days = $day; # Add days for current month
-        $days += array_sum(array_slice($mdays, 0, $month - 1)); # Add days for past months
-        $days += $range * 365; # Add days for past years
-        $days += intval(($range) / 4); # Add leapdays
-        $days -= intval(($range + $offset) / 100); # Subtract 100 year leapdays
-        $days += intval(($range + $offset + $norm) / 400); # Add 400 year leapdays
-        $days -= $leap; # Already counted above
-        # Adjust for Excel erroneously treating 1900 as a leap year.
+        // Accumulate the number of days since the epoch.
+        // Add days for current month
+        $days = $day;
+        // Add days for past months
+        $days += array_sum(array_slice($mdays, 0, $month - 1));
+        // Add days for past years
+        $days += $range * 365;
+        // Add leapdays
+        $days += intval(($range) / 4);
+        // Subtract 100 year leapdays
+        $days -= intval(($range + $offset) / 100);
+        // Add 400 year leapdays
+        $days += intval(($range + $offset + $norm) / 400);
+        // Already counted above
+        $days -= $leap;
+        // Adjust for Excel erroneously treating 1900 as a leap year.
         if ($days > 59) {
             $days++;
         }

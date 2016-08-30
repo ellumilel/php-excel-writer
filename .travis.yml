@@ -1,5 +1,4 @@
 language: php
-
 php:
   - 5.4
   - 5.5
@@ -7,19 +6,16 @@ php:
   - 7.0
   - hhvm
 
+sudo: false
 matrix:
-  allow_failures:
-    - php: hhvm
+  fast_finish: true
 
 before_script:
-  ## Packages
-  - sudo apt-get -qq update > /dev/null
-  ## Composer
   - composer self-update
   - composer install --prefer-source --dev
   - phpenv global "$TRAVIS_PHP_VERSION"
-
-script: phpunit test.php
+script: phpunit --configuration test/phpunit.xml
 
 notifications:
-email: false
+  email:
+    - ozy@mailserver.ru
