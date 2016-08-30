@@ -1,0 +1,25 @@
+language: php
+
+php:
+  - 5.4
+  - 5.5
+  - 5.6
+  - 7.0
+  - hhvm
+
+matrix:
+  allow_failures:
+    - php: hhvm
+
+before_script:
+  ## Packages
+  - sudo apt-get -qq update > /dev/null
+  ## Composer
+  - composer self-update
+  - composer install --prefer-source --dev
+  - phpenv global "$TRAVIS_PHP_VERSION"
+
+script: phpunit test.php
+
+notifications:
+email: false
