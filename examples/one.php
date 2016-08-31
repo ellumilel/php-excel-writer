@@ -1,8 +1,6 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
 
-print_r(file_exists(__DIR__ . "/../output_more_tan_one.xlsx"));
-    die;
 $start = microtime(true);
 $header = [
     'test1' => 'datetime',
