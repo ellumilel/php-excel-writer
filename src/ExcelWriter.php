@@ -367,23 +367,30 @@ class ExcelWriter
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
         $sheet->setColumns([]);
-        foreach ($headerTypes as $v) {
-            $sheet->setColumn($this->addCellFormat($v));
+        foreach ($headerTypes as $val) {
+            $sheet->setColumn($this->addCellFormat($val));
         }
-
         if (!$suppressRow) {
-            $header_row = array_keys($headerTypes);
-            $sheet->getWriter()->write(
-                '<row collapsed="false" customFormat="false" 
-                customHeight="false" hidden="false" ht="12.1" outlineLevel="0" r="'.(1).'">'
-            );
-            foreach ($header_row as $k => $v) {
-                $this->writeCell($sheet->getWriter(), 0, $k, $v, $cell_format_index = '0');
-            }
-            $sheet->getWriter()->write('</row>');
+            $this->writeRowHeader($sheet, array_keys($headerTypes));
             $sheet->increaseRowCount();
         }
         $this->currentSheet = $sheetName;
+    }
+
+    /**
+     * @param Sheet $sheet
+     * @param array $headerRow
+     */
+    private function writeRowHeader(Sheet $sheet, $headerRow)
+    {
+        $sheet->getWriter()->write(
+            '<row collapsed="false" customFormat="false" 
+                customHeight="false" hidden="false" ht="12.1" outlineLevel="0" r="'.(1).'">'
+        );
+        foreach ($headerRow as $k => $v) {
+            $this->writeCell($sheet->getWriter(), 0, $k, $v, $cell_format_index = '0');
+        }
+        $sheet->getWriter()->write('</row>');
     }
 
     /**
@@ -465,9 +472,9 @@ class ExcelWriter
         $sheet->getWriter()->write('</worksheet>');
         $maxCell = self::xlsCell($sheet->getRowCount() - 1, count($sheet->getColumns()) - 1);
         $maxCellTag = '<dimension ref="A1:'.$maxCell.'"/>';
-        $padding_length = $sheet->getMaxCellTagEnd() - $sheet->getMaxCellTagStart() - strlen($maxCellTag);
+        $paddingLength = $sheet->getMaxCellTagEnd() - $sheet->getMaxCellTagStart() - strlen($maxCellTag);
         $sheet->getWriter()->fSeek($sheet->getMaxCellTagStart());
-        $sheet->getWriter()->write($maxCellTag.str_repeat(" ", $padding_length));
+        $sheet->getWriter()->write($maxCellTag.str_repeat(" ", $paddingLength));
         $sheet->getWriter()->close();
         $sheet->setFinalized(true);
     }
