@@ -9,11 +9,11 @@ $header = [
     'head4' => 'string',
     'head5' => 'string',
 ];
-$writer = new Ellumilel\ExcelWriter();
-$writer->setAuthor('BigDataTester');
-$writer->writeSheetHeader('Sheet1', $header);
+$wExcel = new Ellumilel\ExcelWriter();
+$wExcel->setAuthor('BigDataTester');
+$wExcel->writeSheetHeader('Sheet1', $header);
 for ($j = 0; $j < 500000; $j++) {
-    $writer->writeSheetRow('Sheet1', [
+    $wExcel->writeSheetRow('Sheet1', [
         (new DateTime())->format('Y-m-d H:i:s'),
         'foo',
         'baz',
@@ -21,6 +21,6 @@ for ($j = 0; $j < 500000; $j++) {
         123123,
     ]);
 }
-$writer->writeToFile("output_big_data.xlsx");
+$wExcel->writeToFile("output_big_data.xlsx");
 $time = microtime(true) - $start;
 printf("Complete after %.4F sec.\n", $time);

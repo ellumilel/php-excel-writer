@@ -288,8 +288,6 @@ class ExcelWriter
      */
     private function addCellFormat($cellFormat)
     {
-
-
         $cellFormat = strtoupper($this->getCellFormat($cellFormat));
         $position = array_search($cellFormat, $this->cellFormats, $strict = true);
         if ($position === false) {
@@ -302,6 +300,8 @@ class ExcelWriter
     }
 
     /**
+     * @link https://msdn.microsoft.com/en-us/library/documentformat.openxml.spreadsheet.numberingformats(v=office.15).aspx
+     *
      * @param string $cellFormat
      *
      * @return string
@@ -316,6 +316,7 @@ class ExcelWriter
             'dollar' => '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00',
             'money' => '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00',
             'euro' => '#,##0.00 [$€-407];[RED]-#,##0.00 [$€-407]',
+            'rub' => '#,##0.00 [$₽-419];[Red]-#,##0.00 [$₽-419]',
             'NN' => 'DDD',
             'NNN' => 'DDDD',
             'NNNN' => 'DDDD", "',
@@ -409,9 +410,13 @@ class ExcelWriter
      */
     protected function finalizeSheet($sheetName)
     {
-        if (empty($sheetName) || $this->sheets[$sheetName]->getFinalized()) {
+        if (empty($sheetName) || ($this->sheets[$sheetName] instanceof Sheet &&
+                $this->sheets[$sheetName]->getFinalized()
+            )
+        ) {
             return;
         }
+
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
         $sheet->getWriter()->write('</sheetData>');
@@ -473,66 +478,24 @@ class ExcelWriter
 
     /**
      * @param Writer $file
-     * @param $rowNumber
-     * @param $columnNumber
-     * @param $value
+     * @param int $rowNumber
+     * @param int $columnNumber
+     * @param mixed $value
      * @param $cellIndex
      */
-    protected function writeCell(
-        Writer $file,
-        $rowNumber,
-        $columnNumber,
-        $value,
-        $cellIndex
-    ) {
+    protected function writeCell(Writer $file, $rowNumber, $columnNumber, $value, $cellIndex)
+    {
         $cellType = $this->cellTypes[$cellIndex];
         $cellName = ExcelHelper::xlsCell($rowNumber, $columnNumber);
-        if (!is_scalar($value) || $value === '') {
-            $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'"/>');
-        } elseif (is_string($value) && $value{0} == '=') {
+        $cell = $this->sheetXml->getCell($cellName, $cellIndex, $cellType, $value);
+        if (!$cell) {
             $file->write(
-                sprintf(
-                    '<c r="%s" s="%s" t="s"><f>%s</f></c>',
-                    $cellName,
-                    $cellIndex,
-                    ExcelHelper::xmlspecialchars($value)
-                )
-            );
-        } elseif ($cellType == 'date') {
-            $file->write(
-                sprintf(
-                    '<c r="%s" s="%s" t="n"><v>%s</v></c>',
-                    $cellName,
-                    $cellIndex,
-                    ExcelHelper::convertDateTime($value)
-                )
-            );
-        } elseif ($cellType == 'datetime') {
-            $file->write(
-                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.ExcelHelper::convertDateTime($value).'</v></c>'
-            );
-        } elseif ($cellType == 'currency' || $cellType == 'percent' || $cellType == 'numeric') {
-            $file->write(
-                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.ExcelHelper::xmlspecialchars($value).'</v></c>'
+                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="s"><v>'.ExcelHelper::xmlspecialchars(
+                    $this->setSharedString($value)
+                ).'</v></c>'
             );
         } else {
-            if (!is_string($value)) {
-                $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.($value * 1).'</v></c>');
-            } else {
-                if ($value{0} != '0' && $value{0} != '+' && filter_var(
-                    $value,
-                    FILTER_VALIDATE_INT,
-                    ['options' => ['max_range' => ExcelHelper::EXCEL_MAX_RANGE]]
-                )) {
-                    $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.($value * 1).'</v></c>');
-                } else {
-                    $file->write(
-                        '<c r="'.$cellName.'" s="'.$cellIndex.'" t="s"><v>'.ExcelHelper::xmlspecialchars(
-                            $this->setSharedString($value)
-                        ).'</v></c>'
-                    );
-                }
-            }
+            $file->write($cell);
         }
     }
 
@@ -580,17 +543,6 @@ class ExcelWriter
         $file->close();
 
         return $tempFilename;
-    }
-
-    /**
-     * @param $string
-     */
-    public static function log($string)
-    {
-        file_put_contents(
-            "php://stderr",
-            date("Y-m-d H:i:s:").rtrim(is_array($string) ? json_encode($string) : $string)."\n"
-        );
     }
 
     /**

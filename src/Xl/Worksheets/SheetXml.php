@@ -1,6 +1,8 @@
 <?php
 namespace Ellumilel\Xl\Worksheets;
 
+use Ellumilel\Helpers\ExcelHelper;
+
 /**
  * @link https://msdn.microsoft.com/en-us/library/bb264572(v=office.12).aspx
  *
@@ -148,5 +150,110 @@ class SheetXml
         $mc .= '</mergeCells>';
 
         return $mc;
+    }
+
+    /**
+     * @param $cellName
+     * @param $cellIndex
+     * @param $cellType
+     * @param $value
+     *
+     * @return bool|string
+     */
+    public function getCell($cellName, $cellIndex, $cellType, $value)
+    {
+        if (!is_scalar($value) || $value === '') {
+            return '<c r="'.$cellName.'" s="'.$cellIndex.'"/>';
+        }
+
+        if (is_string($value) && $value{0} == '=') {
+            return $this->getFormulaCell($cellName, $cellIndex, $value);
+        }
+
+        if ($cellType == 'date' || $cellType == 'datetime') {
+            return $this->getDateCell($cellName, $cellIndex, $value);
+        } elseif ($cellType == 'currency' || $cellType == 'percent' || $cellType == 'numeric') {
+            return $this->getCurrencyCell($cellName, $cellIndex, $value);
+        }
+
+        if (!is_string($value)) {
+            return $this->getIntCell($cellName, $cellIndex, $value);
+        } else {
+            if ($value{0} != '0' &&
+                $value{0} != '+' &&
+                filter_var(
+                    $value,
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['max_range' => ExcelHelper::EXCEL_MAX_RANGE]]
+                )
+            ) {
+                return $this->getIntCell($cellName, $cellIndex, $value);
+            } else {
+                return false;
+            }
+        }
+    }
+
+    /**
+     * @param $cellName
+     * @param $cellIndex
+     * @param $value
+     *
+     * @return string
+     */
+    private function getDateCell($cellName, $cellIndex, $value)
+    {
+        return sprintf(
+            '<c r="%s" s="%s" t="n"><v>%s</v></c>',
+            $cellName,
+            $cellIndex,
+            ExcelHelper::convertDateTime($value)
+        );
+    }
+
+    /**
+     * @param $cellName
+     * @param $cellIndex
+     * @param $value
+     *
+     * @return string
+     */
+    private function getCurrencyCell($cellName, $cellIndex, $value)
+    {
+        return sprintf(
+            '<c r="%s" s="%s" t="n"><v>%s</v></c>',
+            $cellName,
+            $cellIndex,
+            ExcelHelper::xmlspecialchars($value)
+        );
+    }
+
+    /**
+     * @param $cellName
+     * @param $cellIndex
+     * @param $value
+     *
+     * @return string
+     */
+    private function getIntCell($cellName, $cellIndex, $value)
+    {
+        return '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.($value * 1).'</v></c>';
+    }
+
+    /**
+     * @param $cellName
+     * @param $cellIndex
+     * @param $value
+     *
+     * @return string
+     */
+    private function getFormulaCell($cellName, $cellIndex, $value)
+    {
+        return sprintf(
+            '<c r="%s" s="%s" t="s"><f>%s</f></c>',
+            $cellName,
+            $cellIndex,
+            ExcelHelper::xmlspecialchars($value)
+        );
     }
 }

@@ -35,7 +35,8 @@ or add
 ```
 
 to the require section of your `composer.json` file.
-#### Example
+#### Examples
+##### Simple:
 ```
 $header = [
     'test1' => 'YYYY-MM-DD HH:MM:SS',
@@ -46,11 +47,11 @@ $header = [
     'test6' => 'money',
 ];
 
-$writer = new Ellumilel\ExcelWriter();
-$writer->writeSheetHeader('Sheet1', $header);
-$writer->setAuthor('Your name here');
+$wExcel = new Ellumilel\ExcelWriter();
+$wExcel->writeSheetHeader('Sheet1', $header);
+$wExcel->setAuthor('Your name here');
 for ($i = 0; $i < 5000; $i++) {
-    $writer->writeSheetRow('Sheet1', [
+    $wExcel->writeSheetRow('Sheet1', [
         (new DateTime())->format('Y-m-d H:i:s'),
         rand(0, 1000),
         rand(0, 1000),
@@ -60,5 +61,64 @@ for ($i = 0; $i < 5000; $i++) {
     ]);
 }
 
-$writer->writeToFile("example.xlsx");
+$wExcel->writeToFile("example.xlsx");
+```
+##### Advanced formula/format:
+```
+$header = [
+    'created' => 'date',
+    'id' => 'integer',
+    'count' => '#,##0',
+    'amount' => 'dollar',
+    'description' => 'string',
+    'money' => '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00',
+    'sum' => 'dollar',
+    'rub' => 'rub',
+];
+$data = [
+    [
+        '2016-01-01',
+        123,
+        1002,
+        '103.00',
+        'short string',
+        '=D2*0.15',
+        '=DOLLAR('.rand(10000, 100000).', 2)',
+        rand(10000, 100000),
+    ],
+    [
+        '2016-04-12',
+        234,
+        2045,
+        '2.00',
+        'loooooong string',
+        '=D3*0.15',
+        '=DOLLAR('.rand(10000, 100000).', 2)',
+        rand(10000, 100000),
+    ],
+    [
+        '2016-02-05',
+        45,
+        56,
+        '56.00',
+        'loooooong loooooong string',
+        '=D4*0.15',
+        '=DOLLAR('.rand(10000, 100000).', 2)',
+        rand(10000, 100000),
+    ],
+    [
+        '2016-06-27',
+        534,
+        107,
+        '678.00',
+        'loooooong loooooongloooooong string',
+        '=D5*0.15',
+        '=DOLLAR('.rand(10000, 100000).', 2)',
+        rand(10000, 100000),
+    ],
+];
+
+$wExcel = new Ellumilel\ExcelWriter();
+$wExcel->writeSheet($data, 'Sheet1', $header);
+$wExcel->writeToFile('formulas.xlsx');
 ```

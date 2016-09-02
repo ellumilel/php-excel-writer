@@ -8,17 +8,17 @@ $header = [
     'test3' => 'euro',
     'test4' => 'dollar',
 ];
-$writer = new Ellumilel\ExcelWriter();
-$writer->setAuthor('Tester');
-$writer->writeSheetHeader('Sheet1', $header);
+$wExcel = new Ellumilel\ExcelWriter();
+$wExcel->setAuthor('Tester');
+$wExcel->writeSheetHeader('Sheet1', $header);
 for ($i = 0; $i < 500; $i++) {
-    $writer->writeSheetRow('Sheet1', [
+    $wExcel->writeSheetRow('Sheet1', [
         (new DateTime())->format('Y-m-d H:i:s'),
         rand(0, 1000),
         rand(0, 1000),
         rand(0, 1000),
     ]);
 }
-$writer->writeToFile("output_one.xlsx");
+$wExcel->writeToFile("output_one.xlsx");
 $time = microtime(true) - $start;
 printf("Complete after: %.4F sec.\n", $time);
