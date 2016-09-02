@@ -53,15 +53,44 @@ $wExcel->setAuthor('Your name here');
 for ($i = 0; $i < 5000; $i++) {
     $wExcel->writeSheetRow('Sheet1', [
         (new DateTime())->format('Y-m-d H:i:s'),
-        rand(0, 1000),
-        rand(0, 1000),
-        rand(0, 1000),
-        rand(0, 1000),
-        rand(0, 1000),
+        rand(100, 10000),
+        rand(100, 10000),
+        rand(100, 10000),
+        rand(100, 10000),
+        rand(100, 10000),
     ]);
 }
 
 $wExcel->writeToFile("example.xlsx");
+```
+##### 3.200.000 cell data example, low memory ~0.84 mb, fast write ~120 sec:
+```
+$header = [
+    'head1' => 'YYYY-MM-DD HH:MM:SS',
+    'head2' => 'string',
+    'head3' => 'string',
+    'head4' => 'string',
+    'head5' => 'string',
+    'head6' => 'string',
+    'head7' => 'string',
+    'head8' => 'string',
+];
+$wExcel = new Ellumilel\ExcelWriter();
+$wExcel->setAuthor('BigData Tester');
+$wExcel->writeSheetHeader('Sheet1', $header);
+for ($ex = 0; $ex < 400000; $ex++) {
+    $wExcel->writeSheetRow('Sheet1', [
+        (new DateTime())->format('Y-m-d H:i:s'),
+        'foo',
+        'baz',
+        'your text hear',
+        rand(10000, 100000),
+        rand(10000, 100000),
+        rand(10000, 100000),
+        rand(10000, 100000),
+    ]);
+}
+$wExcel->writeToFile("output_big_data.xlsx");
 ```
 ##### Advanced formula/format:
 ```
