@@ -176,6 +176,18 @@ class SheetXml
             return $this->getCurrencyCell($cellName, $cellIndex, $value);
         }
 
+        return $this->checkIntCell($cellName, $cellIndex, $value);
+    }
+
+    /**
+     * @param $cellName
+     * @param $cellIndex
+     * @param $value
+     *
+     * @return bool|string
+     */
+    private function checkIntCell($cellName, $cellIndex, $value)
+    {
         if (!is_string($value)) {
             return $this->getIntCell($cellName, $cellIndex, $value);
         } else {

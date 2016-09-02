@@ -382,7 +382,7 @@ class ExcelWriter
         $sheet = &$this->sheets[$sheetName];
         $columns = $sheet->getColumns();
         if (empty($columns)) {
-            $sheet->setColumns(array_fill($from = 0, $until = count($row), '0'));
+            $sheet->setColumns(array_fill(0, count($row), '0'));
         }
         $sheet->getWriter()->write(
             '<row collapsed="false" customFormat="false" customHeight="false" 
@@ -488,7 +488,7 @@ class ExcelWriter
         $cellType = $this->cellTypes[$cellIndex];
         $cellName = ExcelHelper::xlsCell($rowNumber, $columnNumber);
         $cell = $this->sheetXml->getCell($cellName, $cellIndex, $cellType, $value);
-        if (!$cell) {
+        if ($cell === false) {
             $file->write(
                 '<c r="'.$cellName.'" s="'.$cellIndex.'" t="s"><v>'.ExcelHelper::xmlspecialchars(
                     $this->setSharedString($value)
