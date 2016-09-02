@@ -594,23 +594,6 @@ class ExcelWriter
     }
 
     /**
-     * @link https://msdn.microsoft.com/ru-RU/library/aa365247%28VS.85%29.aspx
-     *
-     * @param string $filename
-     *
-     * @return mixed
-     */
-    public static function checkFilename($filename)
-    {
-        $invalidCharacter = array_merge(
-            array_map('chr', range(0, 31)),
-            ['<', '>', '?', '"', ':', '|', '\\', '/', '*', '&']
-        );
-
-        return str_replace($invalidCharacter, '', $filename);
-    }
-
-    /**
      * @param \ZipArchive $zip
      * @param string $filename
      */
