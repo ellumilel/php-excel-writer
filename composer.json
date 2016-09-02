@@ -1,7 +1,17 @@
 {
     "name": "ellumilel/php-excel-writer",
-    "description": "Big data Excel writer",
-    "keywords": ["excel-writer", "excel", "export", "xlsx", "spreadsheet", "php-excel", "big-data"],
+    "description": "Big data Excel writer with small memory consuming",
+    "keywords": [
+        "php-excel-writer",
+        "excel-downloader",
+        "excel-writer",
+        "excel",
+        "export",
+        "xlsx",
+        "spreadsheet",
+        "php-excel",
+        "big-data"
+    ],
     "homepage": "https://github.com/Ellumilel/php-excel-writer",
     "license": "MIT",
     "authors": [

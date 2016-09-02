@@ -16,13 +16,12 @@ Excel spreadsheet in with (Office 2007+) xlsx format, with just basic features
 * takes UTF-8 encoded input
 * multiple worksheets
 
-#### Installation
-The preferred way to install this extension is through [composer](http://getcomposer.org/download/).
-
 #### Dev
 * PHPUnit
 * Optional: PHP_CodeSniffer for PSR-X-compatibility checks
 
+#### Installation
+The preferred way to install this extension is through [composer](http://getcomposer.org/download/).
 Either run
 
 ```
@@ -49,7 +48,7 @@ $header = [
 
 $writer = new Ellumilel\ExcelWriter();
 $writer->writeSheetHeader('Sheet1', $header);
-
+$writer->setAuthor('Your name here');
 for ($i = 0; $i < 5000; $i++) {
     $writer->writeSheetRow('Sheet1', [
         (new DateTime())->format('Y-m-d H:i:s'),
