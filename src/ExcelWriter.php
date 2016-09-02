@@ -3,10 +3,12 @@ namespace Ellumilel;
 
 use Ellumilel\DocProps\App;
 use Ellumilel\DocProps\Core;
+use Ellumilel\Helpers\ExcelHelper;
 use Ellumilel\Rels\Relationships;
 use Ellumilel\Xl\SharedStrings;
 use Ellumilel\Xl\Styles;
 use Ellumilel\Xl\Workbook;
+use Ellumilel\Xl\Worksheets\SheetXml;
 
 /**
  * Class ExcelWriter
@@ -15,30 +17,18 @@ use Ellumilel\Xl\Workbook;
  */
 class ExcelWriter
 {
-    /**
-     * @link http://office.microsoft.com/en-us/excel-help/excel-specifications-and-limits-HP010073849.aspx
-     */
-    const EXCEL_MAX_ROW = 1048576;
-    const EXCEL_MAX_RANGE = 2147483647;
-    const EXCEL_MAX_COL = 16384;
-
-    /** @var string */
-    private $urlSchemaFormat = 'http://schemas.openxmlformats.org/officeDocument/2006';
-
-    /** @var string */
-    protected $author ='Unknown Author';
     /** @var array */
     protected $sheets = [];
     /** @var array */
-    protected $sharedStrings = [];//unique set
+    protected $sharedStrings = [];
     /** @var int */
-    protected $sharedStringCount = 0;//count of non-unique references to the unique set
+    protected $sharedStringCount = 0;
     /** @var array */
     protected $tempFiles = [];
     /** @var array */
-    protected $cellFormats = [];//contains excel format like YYYY-MM-DD HH:MM:SS
+    protected $cellFormats = [];
     /** @var array */
-    protected $cellTypes = [];//contains friendly format like datetime
+    protected $cellTypes = [];
     /** @var string  */
     protected $currentSheet = '';
     /** @var null */
@@ -49,6 +39,8 @@ class ExcelWriter
     protected $app;
     /** @var Workbook */
     protected $workbook;
+    /** @var SheetXml */
+    protected $sheetXml;
 
     /**
      * ExcelWriter constructor.
@@ -59,23 +51,22 @@ class ExcelWriter
         if (!class_exists('ZipArchive')) {
             throw new \Exception('ZipArchive not found');
         }
-
         if (!ini_get('date.timezone')) {
-            //using date functions can kick out warning if this isn't set
             date_default_timezone_set('UTC');
         }
         $this->addCellFormat($cell_format = 'GENERAL');
         $this->core = new Core();
         $this->app = new App();
         $this->workbook = new Workbook();
+        $this->sheetXml = new SheetXml();
     }
 
     /**
      * @param string $author
      */
-    public function setAuthor($author = '')
+    public function setAuthor($author)
     {
-        $this->author = $author;
+        $this->core->setAuthor($author);
     }
 
     public function __destruct()
@@ -104,7 +95,7 @@ class ExcelWriter
     protected function tempFilename()
     {
         $tmpDir = is_null($this->tmpDir) ? sys_get_temp_dir() : $this->tmpDir;
-        $filename = tempnam($tmpDir, "exlsWriter_");
+        $filename = tempnam($tmpDir, "excelWriter_");
         $this->tempFiles[] = $filename;
 
         return $filename;
@@ -134,32 +125,23 @@ class ExcelWriter
      */
     public function writeToFile($filename)
     {
+        $zip = new \ZipArchive();
         foreach ($this->sheets as $sheetName => $sheet) {
             $this->finalizeSheet($sheetName);
         }
-        if (file_exists($filename) && is_writable($filename)) {
-            unlink($filename);
-        }
-
-        $zip = new \ZipArchive();
-        if (empty($this->sheets) || !$zip->open($filename, \ZipArchive::CREATE)) {
-            self::log("Error in ".__CLASS__."::".__FUNCTION__.", no worksheets defined or unable to create zip.");
-            return;
-        }
-
+        $this->checkAndUnlink($zip, $filename);
         $this->workbook->setSheet($this->sheets);
 
         $contentTypes = new ContentTypes(!empty($this->sharedStrings));
         $contentTypes->setSheet($this->sheets);
 
-        $rels = new Relationships(!empty($this->sharedStrings));
-        $rels->setSheet($this->sheets);
-
+        $rel = new Relationships(!empty($this->sharedStrings));
+        $rel->setSheet($this->sheets);
         $zip->addEmptyDir("docProps/");
         $zip->addFromString("docProps/app.xml", $this->app->buildAppXML());
         $zip->addFromString("docProps/core.xml", $this->core->buildCoreXML());
         $zip->addEmptyDir("_rels/");
-        $zip->addFromString("_rels/.rels", $rels->buildRelationshipsXML());
+        $zip->addFromString("_rels/.rels", $rel->buildRelationshipsXML());
         $zip->addEmptyDir("xl/worksheets/");
         foreach ($this->sheets as $sheet) {
             /** @var Sheet $sheet */
@@ -178,7 +160,7 @@ class ExcelWriter
         );
         $zip->addFromString("[Content_Types].xml", $contentTypes->buildContentTypesXML());
         $zip->addEmptyDir("xl/_rels/");
-        $zip->addFromString("xl/_rels/workbook.xml.rels", $rels->buildWorkbookRelationshipsXML());
+        $zip->addFromString("xl/_rels/workbook.xml.rels", $rel->buildWorkbookRelationshipsXML());
         $zip->close();
     }
 
@@ -202,32 +184,16 @@ class ExcelWriter
         $this->sheets[$sheetName] = $sheetObj;
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
-        $selectedTab = count($this->sheets) == 1 ? 'true' : 'false';//only first sheet is selected
-        $maxCell = ExcelWriter::xlsCell(self::EXCEL_MAX_ROW, self::EXCEL_MAX_COL);//XFE1048577
-        $sheet->getWriter()->write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'."\n");
-        $sheet->getWriter()->write(
-            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" 
-                xmlns:r="'.$this->urlSchemaFormat.'/relationships">'
-        );
-        $sheet->getWriter()->write('<sheetPr filterMode="false">');
-        $sheet->getWriter()->write('<pageSetUpPr fitToPage="false"/>');
-        $sheet->getWriter()->write('</sheetPr>');
+        $selectedTab = count($this->sheets) == 1 ? 'true' : 'false';
+        $maxCell = ExcelHelper::xlsCell(ExcelHelper::EXCEL_MAX_ROW, ExcelHelper::EXCEL_MAX_COL);
+        $sheet->getWriter()->write($this->sheetXml->getXml());
+        $sheet->getWriter()->write($this->sheetXml->getWorksheet());
+        $sheet->getWriter()->write($this->sheetXml->getSheetPr());
         $sheet->setMaxCellTagStart($sheet->getWriter()->fTell());
-        $sheet->getWriter()->write('<dimension ref="A1:'.$maxCell.'"/>');
+        $sheet->getWriter()->write($this->sheetXml->getDimension($maxCell));
         $sheet->setMaxCellTagEnd($sheet->getWriter()->fTell());
-        $sheet->getWriter()->write('<sheetViews>');
-        $sheet->getWriter()->write(
-            '<sheetView colorId="64" defaultGridColor="true" rightToLeft="false" showFormulas="false" 
-            showGridLines="true" showOutlineSymbols="true" showRowColHeaders="true" showZeros="true" 
-            tabSelected="'.$selectedTab.'" topLeftCell="A1" view="normal" windowProtection="false" 
-            workbookViewId="0" zoomScale="100" zoomScaleNormal="100" zoomScalePageLayoutView="100">'
-        );
-        $sheet->getWriter()->write('<selection activeCell="A1" activeCellId="0" pane="topLeft" sqref="A1"/>');
-        $sheet->getWriter()->write('</sheetView>');
-        $sheet->getWriter()->write('</sheetViews>');
-        $sheet->getWriter()->write('<cols>');
-        $sheet->getWriter()->write('<col collapsed="false" hidden="false" max="1025" min="1" style="0" width="11.5"/>');
-        $sheet->getWriter()->write('</cols>');
+        $sheet->getWriter()->write($this->sheetXml->getSheetViews($selectedTab));
+        $sheet->getWriter()->write($this->sheetXml->getCools());
         $sheet->getWriter()->write('<sheetData>');
     }
 
@@ -245,29 +211,32 @@ class ExcelWriter
         if ($cellFormat == '0') {
             return 'numeric';
         }
-        if (preg_match("/[H]{1,2}:[M]{1,2}/", $cellFormat)) {
-            return 'datetime';
-        }
-        if (preg_match("/[M]{1,2}:[S]{1,2}/", $cellFormat)) {
-            return 'datetime';
-        }
-        if (preg_match("/[YY]{2,4}/", $cellFormat)) {
-            return 'date';
-        }
-        if (preg_match("/[D]{1,2}/", $cellFormat)) {
-            return 'date';
-        }
-        if (preg_match("/[M]{1,2}/", $cellFormat)) {
-            return 'date';
-        }
-        if (preg_match("/$/", $cellFormat)) {
-            return 'currency';
-        }
-        if (preg_match("/%/", $cellFormat)) {
-            return 'percent';
-        }
-        if (preg_match("/0/", $cellFormat)) {
-            return 'numeric';
+        $checkArray = [
+            'datetime' => [
+                "/[H]{1,2}:[M]{1,2}/",
+                "/[M]{1,2}:[S]{1,2}/",
+            ],
+            'numeric' => [
+                "/0/",
+            ],
+            'date' => [
+                "/[YY]{2,4}/",
+                "/[D]{1,2}/",
+                "/[M]{1,2}/",
+            ],
+            'currency' => [
+                "/$/",
+            ],
+            'percent' => [
+                "/%/",
+            ],
+        ];
+        foreach ($checkArray as $type => $item) {
+            foreach ($item as $prMatch) {
+                if (preg_match($prMatch, $cellFormat)) {
+                    return $type;
+                }
+            }
         }
 
         return 'string';
@@ -319,40 +288,9 @@ class ExcelWriter
      */
     private function addCellFormat($cellFormat)
     {
-        switch ($cellFormat) {
-            case 'string':
-                $cellFormat = 'GENERAL';
-                break;
-            case 'integer':
-                $cellFormat = '0';
-                break;
-            case 'date':
-                $cellFormat = 'YYYY-MM-DD';
-                break;
-            case 'datetime':
-                $cellFormat = 'YYYY-MM-DD HH:MM:SS';
-                break;
-            case 'dollar':
-                $cellFormat = '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00';
-                break;
-            case 'money':
-                $cellFormat = '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00';
-                break;
-            case 'euro':
-                $cellFormat = '#,##0.00 [$€-407];[RED]-#,##0.00 [$€-407]';
-                break;
-            case 'NN':
-                $cellFormat = 'DDD';
-                break;
-            case 'NNN':
-                $cellFormat = 'DDDD';
-                break;
-            case 'NNNN':
-                $cellFormat = 'DDDD", "';
-                break;
-        }
 
-        $cellFormat = strtoupper($cellFormat);
+
+        $cellFormat = strtoupper($this->getCellFormat($cellFormat));
         $position = array_search($cellFormat, $this->cellFormats, $strict = true);
         if ($position === false) {
             $position = count($this->cellFormats);
@@ -361,6 +299,32 @@ class ExcelWriter
         }
 
         return $position;
+    }
+
+    /**
+     * @param string $cellFormat
+     *
+     * @return string
+     */
+    private function getCellFormat($cellFormat)
+    {
+        $formatArray = [
+            'string' => 'GENERAL',
+            'integer' => '0',
+            'date' => 'YYYY-MM-DD',
+            'datetime' => 'YYYY-MM-DD HH:MM:SS',
+            'dollar' => '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00',
+            'money' => '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00',
+            'euro' => '#,##0.00 [$€-407];[RED]-#,##0.00 [$€-407]',
+            'NN' => 'DDD',
+            'NNN' => 'DDDD',
+            'NNNN' => 'DDDD", "',
+        ];
+
+        if (array_key_exists($cellFormat, $formatArray)) {
+            return $formatArray[$cellFormat];
+        }
+        return $cellFormat;
     }
 
     /**
@@ -453,35 +417,15 @@ class ExcelWriter
         $sheet->getWriter()->write('</sheetData>');
         $mergeCells = $sheet->getMergeCells();
         if (!empty($mergeCells)) {
-            $sheet->getWriter()->write('<mergeCells>');
-            foreach ($mergeCells as $range) {
-                $sheet->getWriter()->write('<mergeCell ref="'.$range.'"/>');
-            }
-            $sheet->getWriter()->write('</mergeCells>');
+            $sheet->getWriter()->write($this->sheetXml->getMergeCells($mergeCells));
         }
-        $sheet->getWriter()->write(
-            '<printOptions headings="false" gridLines="false" gridLinesSet="true" horizontalCentered="false"
-                verticalCentered="false"/>'
-        );
-        $sheet->getWriter()->write(
-            '<pageMargins left="0.5" right="0.5" top="1.0" bottom="1.0" header="0.5" footer="0.5"/>'
-        );
-        $sheet->getWriter()->write(
-            '<pageSetup blackAndWhite="false" cellComments="none" copies="1" draft="false" firstPageNumber="1" 
-                fitToHeight="1" fitToWidth="1" horizontalDpi="300" orientation="portrait" pageOrder="downThenOver" 
-                paperSize="1" scale="100" useFirstPageNumber="true" usePrinterDefaults="false" verticalDpi="300"/>'
-        );
-        $sheet->getWriter()->write('<headerFooter differentFirst="false" differentOddEven="false">');
-        $sheet->getWriter()->write(
-            '<oddHeader>&amp;C&amp;&quot;Times New Roman,Regular&quot;&amp;12&amp;A</oddHeader>'
-        );
-        $sheet->getWriter()->write(
-            '<oddFooter>&amp;C&amp;&quot;Times New Roman,Regular&quot;&amp;12Page &amp;P</oddFooter>'
-        );
-        $sheet->getWriter()->write('</headerFooter>');
+        $sheet->getWriter()->write($this->sheetXml->getPrintOptions());
+        $sheet->getWriter()->write($this->sheetXml->getPageMargins());
+        $sheet->getWriter()->write($this->sheetXml->getPageSetup());
+        $sheet->getWriter()->write($this->sheetXml->getHeaderFooter());
         $sheet->getWriter()->write('</worksheet>');
-        $maxCell = self::xlsCell($sheet->getRowCount() - 1, count($sheet->getColumns()) - 1);
-        $maxCellTag = '<dimension ref="A1:'.$maxCell.'"/>';
+        $maxCell = ExcelHelper::xlsCell($sheet->getRowCount() - 1, count($sheet->getColumns()) - 1);
+        $maxCellTag = $this->sheetXml->getDimension($maxCell);
         $paddingLength = $sheet->getMaxCellTagEnd() - $sheet->getMaxCellTagStart() - strlen($maxCellTag);
         $sheet->getWriter()->fSeek($sheet->getMaxCellTagStart());
         $sheet->getWriter()->write($maxCellTag.str_repeat(" ", $paddingLength));
@@ -504,8 +448,8 @@ class ExcelWriter
         $this->initializeSheet($sheetName);
         /** @var Sheet $sheet */
         $sheet = &$this->sheets[$sheetName];
-        $startCell = self::xlsCell($startCellRow, $startCellColumn);
-        $endCell = self::xlsCell($endCellRow, $endCellColumn);
+        $startCell = ExcelHelper::xlsCell($startCellRow, $startCellColumn);
+        $endCell = ExcelHelper::xlsCell($endCellRow, $endCellColumn);
         $sheet->setMergeCells($startCell.":".$endCell);
     }
 
@@ -542,24 +486,34 @@ class ExcelWriter
         $cellIndex
     ) {
         $cellType = $this->cellTypes[$cellIndex];
-        $cellName = self::xlsCell($rowNumber, $columnNumber);
+        $cellName = ExcelHelper::xlsCell($rowNumber, $columnNumber);
         if (!is_scalar($value) || $value === '') {
             $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'"/>');
         } elseif (is_string($value) && $value{0} == '=') {
             $file->write(
-                sprintf('<c r="%s" s="%s" t="s"><f>%s</f></c>', $cellName, $cellIndex, self::xmlspecialchars($value))
+                sprintf(
+                    '<c r="%s" s="%s" t="s"><f>%s</f></c>',
+                    $cellName,
+                    $cellIndex,
+                    ExcelHelper::xmlspecialchars($value)
+                )
             );
         } elseif ($cellType == 'date') {
             $file->write(
-                sprintf('<c r="%s" s="%s" t="n"><v>%s</v></c>', $cellName, $cellIndex, self::convertDateTime($value))
+                sprintf(
+                    '<c r="%s" s="%s" t="n"><v>%s</v></c>',
+                    $cellName,
+                    $cellIndex,
+                    ExcelHelper::convertDateTime($value)
+                )
             );
         } elseif ($cellType == 'datetime') {
             $file->write(
-                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.self::convertDateTime($value).'</v></c>'
+                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.ExcelHelper::convertDateTime($value).'</v></c>'
             );
         } elseif ($cellType == 'currency' || $cellType == 'percent' || $cellType == 'numeric') {
             $file->write(
-                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.self::xmlspecialchars($value).'</v></c>'
+                '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.ExcelHelper::xmlspecialchars($value).'</v></c>'
             );
         } else {
             if (!is_string($value)) {
@@ -568,12 +522,12 @@ class ExcelWriter
                 if ($value{0} != '0' && $value{0} != '+' && filter_var(
                     $value,
                     FILTER_VALIDATE_INT,
-                    ['options' => ['max_range' => self::EXCEL_MAX_RANGE]]
+                    ['options' => ['max_range' => ExcelHelper::EXCEL_MAX_RANGE]]
                 )) {
                     $file->write('<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.($value * 1).'</v></c>');
                 } else {
                     $file->write(
-                        '<c r="'.$cellName.'" s="'.$cellIndex.'" t="s"><v>'.self::xmlspecialchars(
+                        '<c r="'.$cellName.'" s="'.$cellIndex.'" t="s"><v>'.ExcelHelper::xmlspecialchars(
                             $this->setSharedString($value)
                         ).'</v></c>'
                     );
@@ -629,22 +583,6 @@ class ExcelWriter
     }
 
     /**
-     * @param int $rowNumber
-     * @param int $columnNumber
-     *
-     * @return string Cell label/coordinates (A1, C3, AA42)
-     */
-    public static function xlsCell($rowNumber, $columnNumber)
-    {
-        $n = $columnNumber;
-        for ($r = ""; $n >= 0; $n = intval($n / 26) - 1) {
-            $r = chr($n % 26 + 0x41).$r;
-        }
-
-        return $r.($rowNumber + 1);
-    }
-
-    /**
      * @param $string
      */
     public static function log($string)
@@ -673,88 +611,18 @@ class ExcelWriter
     }
 
     /**
-     * @param $val
-     *
-     * @return mixed
+     * @param \ZipArchive $zip
+     * @param string $filename
      */
-    public static function xmlspecialchars($val)
+    private function checkAndUnlink(\ZipArchive $zip, $filename)
     {
-        return str_replace("'", "&#39;", htmlspecialchars($val));
-    }
-
-    /**
-     * @param string $dateInput
-     *
-     * @return int
-     */
-    public static function convertDateTime($dateInput)
-    {
-        // Time expressed as fraction of 24h hours in seconds
-        $seconds = 0;
-        $year = $month = $day = 0;
-        $dateTime = $dateInput;
-        if (preg_match("/(\d{4})\-(\d{2})\-(\d{2})/", $dateTime, $matches)) {
-            list($year, $month, $day) = $matches;
+        if (file_exists($filename) && is_writable($filename)) {
+            unlink($filename);
         }
-        if (preg_match("/(\d{2}):(\d{2}):(\d{2})/", $dateTime, $matches)) {
-            list($hour, $min, $sec) = $matches;
-            $seconds = ($hour * 60 * 60 + $min * 60 + $sec) / (24 * 60 * 60);
+        if (empty($this->sheets) || !$zip->open($filename, \ZipArchive::CREATE)) {
+            throw new \RuntimeException(
+                "Error in ".__CLASS__."::".__FUNCTION__.", no worksheets defined or unable to create zip."
+            );
         }
-        //using 1900 as epoch, not 1904, ignoring 1904 special case
-        // Special cases for Excel.
-        if ("$year-$month-$day" == '1899-12-31') {
-            return $seconds;
-        }    // Excel 1900 epoch
-        if ("$year-$month-$day" == '1900-01-00') {
-            return $seconds;
-        }    // Excel 1900 epoch
-        if ("$year-$month-$day" == '1900-02-29') {
-            return 60 + $seconds;
-        }
-        // Excel false leapday
-        /*
-         We calculate the date by calculating the number of days since the epoch
-         and adjust for the number of leap days. We calculate the number of leap
-         days by normalising the year in relation to the epoch. Thus the year 2000
-         becomes 100 for 4 and 100 year leapdays and 400 for 400 year leapdays.
-        */
-        $epoch  = 1900;
-        $offset = 0;
-        $norm   = 300;
-        $range  = $year - $epoch;
-        // Set month days and check for leap year.
-        $leap = (($year % 400 == 0) || (($year % 4 == 0) && ($year % 100)) ) ? 1 : 0;
-        $mdays = array( 31, ($leap ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 );
-        // Some boundary checks
-        if ($year < $epoch || $year > 9999) {
-            return 0;
-        }
-        if ($month < 1 || $month > 12) {
-            return 0;
-        }
-        if ($day < 1 || $day > $mdays[$month - 1]) {
-            return 0;
-        }
-        // Accumulate the number of days since the epoch.
-        // Add days for current month
-        $days = $day;
-        // Add days for past months
-        $days += array_sum(array_slice($mdays, 0, $month - 1));
-        // Add days for past years
-        $days += $range * 365;
-        // Add leapdays
-        $days += intval(($range) / 4);
-        // Subtract 100 year leapdays
-        $days -= intval(($range + $offset) / 100);
-        // Add 400 year leapdays
-        $days += intval(($range + $offset + $norm) / 400);
-        // Already counted above
-        $days -= $leap;
-        // Adjust for Excel erroneously treating 1900 as a leap year.
-        if ($days > 59) {
-            $days++;
-        }
-
-        return $days + $seconds;
     }
 }

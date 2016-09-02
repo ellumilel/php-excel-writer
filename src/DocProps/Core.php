@@ -30,15 +30,10 @@ class Core
     /**
      * Core constructor.
      *
-     * @param string $author
      * @param integer $revision
      */
-    public function __construct($author = '', $revision = 0)
+    public function __construct($revision = 0)
     {
-        if (!empty($author)) {
-            $this->author = $author;
-        }
-
         $this->revision = $revision;
     }
 
@@ -93,5 +88,19 @@ class Core
     private function revision()
     {
         return '<cp:revision>'.$this->revision.'</cp:revision>';
+    }
+
+    /**
+     * @param string $author
+     *
+     * @return $this
+     */
+    public function setAuthor($author)
+    {
+        if (!empty($author)) {
+            $this->author = $author;
+        }
+
+        return $this;
     }
 }
