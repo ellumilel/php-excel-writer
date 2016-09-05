@@ -311,6 +311,7 @@ class ExcelWriter
         $formatArray = [
             'string' => 'GENERAL',
             'integer' => '0',
+            'decimal' => '#,##0.00',
             'date' => 'YYYY-MM-DD',
             'datetime' => 'YYYY-MM-DD HH:MM:SS',
             'dollar' => '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00',

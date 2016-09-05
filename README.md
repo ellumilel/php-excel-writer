@@ -1,26 +1,27 @@
-### Big data Excel writer. Relatively low memory usage.
+## Big data Excel writer. Relatively low memory usage.
 Excel spreadsheet in with (Office 2007+) xlsx format, with just basic features
 
-#### Build:
+### Build:
 [![Latest Stable Version](https://poser.pugx.org/ellumilel/php-excel-writer/v/stable)](https://packagist.org/packages/ellumilel/php-excel-writer)
+[![Latest Unstable Version](https://poser.pugx.org/ellumilel/php-excel-writer/v/unstable)](https://packagist.org/packages/ellumilel/php-excel-writer)
 [![Build Status](https://travis-ci.org/ellumilel/php-excel-writer.svg?branch=master)](http://travis-ci.org/ellumilel/php-excel-writer)
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/ellumilel/php-excel-writer/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/ellumilel/php-excel-writer/?branch=master)
 [![License](https://poser.pugx.org/ellumilel/php-excel-writer/license)](https://packagist.org/packages/ellumilel/php-excel-writer)
-#### Use:
+### Use:
 - `ZipArchive`, based on PHP's [Zip extension](http://fr.php.net/manual/en/book.zip.php)
 
-#### Supports
+### Supports
 * supports PHP 5.4+
 * supports simple formulas
 * supports currency/date/numeric cell formatting
 * takes UTF-8 encoded input
 * multiple worksheets
 
-#### Dev
+### Dev
 * PHPUnit
 * Optional: PHP_CodeSniffer for PSR-X-compatibility checks
 
-#### Installation
+### Installation
 The preferred way to install this extension is through [composer](http://getcomposer.org/download/).
 Either run
 
@@ -35,8 +36,22 @@ or add
 ```
 
 to the require section of your `composer.json` file.
-#### Examples
-##### Simple:
+### Formats
+*   'string' = 'GENERAL'
+*   'integer' = '0'
+*   'decimal' = '#,##0.00'
+*   'date' = 'YYYY-MM-DD'
+*   'datetime' = 'YYYY-MM-DD HH:MM:SS'
+*   'dollar' = '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00'
+*   'money' = '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00'
+*   'euro' = '#,##0.00 [$€-407];[RED]-#,##0.00 [$€-407]'
+*   'rub' = '#,##0.00 [$₽-419];[Red]-#,##0.00 [$₽-419]'
+*   'NN' = 'DDD'
+*   'NNN' = 'DDDD'
+*   'NNNN' = 'DDDD", "'
+
+### Examples
+#### Simple:
 ```
 $header = [
     'test1' => 'YYYY-MM-DD HH:MM:SS',
@@ -63,7 +78,7 @@ for ($i = 0; $i < 5000; $i++) {
 
 $wExcel->writeToFile("example.xlsx");
 ```
-##### 3.200.000 cell data example, low memory ~0.84 mb, fast write ~120 sec:
+#### 3.200.000 cell data example, low memory ~0.84 mb, fast write ~120 sec:
 ```
 $header = [
     'head1' => 'YYYY-MM-DD HH:MM:SS',
@@ -92,7 +107,7 @@ for ($ex = 0; $ex < 400000; $ex++) {
 }
 $wExcel->writeToFile("output_big_data.xlsx");
 ```
-##### Advanced formula/format:
+#### Advanced formula/format:
 ```
 $header = [
     'created' => 'date',
