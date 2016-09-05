@@ -31,9 +31,7 @@ class ExcelHelper
             $month = $matches[2];
             $day = $matches[3];
         }
-        if (preg_match("/(\d{2}):(\d{2}):(\d{2})/", $dateTime, $matches)) {
-            $seconds = ($matches[1] * 60 * 60 + $matches[2] * 60 + $matches[3]) / 86400;
-        }
+        $seconds = self::getSeconds($dateTime);
         if ("$year-$month-$day" == '1899-12-31' || "$year-$month-$day" == '1900-01-00') {
             return $seconds;
         }
@@ -98,5 +96,58 @@ class ExcelHelper
         );
 
         return str_replace($invalidCharacter, '', $filename);
+    }
+
+    /**
+     * @todo  check escaping
+     *
+     * @param string $cellFormat
+     *
+     * @return string
+     */
+    public static function escapeCellFormat($cellFormat)
+    {
+        $ignoreUntil = '';
+        $escaped = '';
+        for ($i = 0, $ix = strlen($cellFormat); $i < $ix; $i++) {
+            $c = $cellFormat[$i];
+            if ($ignoreUntil == '' && $c == '[') {
+                $ignoreUntil = ']';
+            } else {
+                if ($ignoreUntil == '' && $c == '"') {
+                    $ignoreUntil = '"';
+                } else {
+                    if ($ignoreUntil == $c) {
+                        $ignoreUntil = '';
+                    }
+                }
+            }
+            if ($ignoreUntil == '' &&
+                ($c == ' ' || $c == '-' || $c == '(' || $c == ')') &&
+                ($i == 0 || $cellFormat[$i - 1] != '_')
+            ) {
+                $escaped .= "\\".$c;
+            } else {
+                $escaped .= $c;
+            }
+        }
+
+        return $escaped;
+    }
+
+    /**
+     * @param $dateTime
+     *
+     * @return float|int
+     */
+    private function getSeconds($dateTime)
+    {
+        $seconds = 0;
+
+        if (preg_match("/(\d{2}):(\d{2}):(\d{2})/", $dateTime, $matches)) {
+            $seconds = ($matches[1] * 60 * 60 + $matches[2] * 60 + $matches[3]) / 86400;
+        }
+
+        return $seconds;
     }
 }

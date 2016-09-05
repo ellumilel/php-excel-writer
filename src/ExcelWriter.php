@@ -148,16 +148,10 @@ class ExcelWriter
             $zip->addFile($sheet->getFilename(), "xl/worksheets/".$sheet->getXmlName());
         }
         if (!empty($this->sharedStrings)) {
-            $zip->addFile(
-                $this->writeSharedStringsXML(),
-                "xl/sharedStrings.xml"
-            );
+            $zip->addFile($this->writeSharedStringsXML(), "xl/sharedStrings.xml");
         }
         $zip->addFromString("xl/workbook.xml", $this->workbook->buildWorkbookXML());
-        $zip->addFile(
-            $this->writeStylesXML(),
-            "xl/styles.xml"
-        );
+        $zip->addFile($this->writeStylesXML(), "xl/styles.xml");
         $zip->addFromString("[Content_Types].xml", $contentTypes->buildContentTypesXML());
         $zip->addEmptyDir("xl/_rels/");
         $zip->addFromString("xl/_rels/workbook.xml.rels", $rel->buildWorkbookRelationshipsXML());
@@ -243,43 +237,6 @@ class ExcelWriter
     }
 
     /**
-     * @todo  check escaping
-     *
-     * @param $cellFormat
-     *
-     * @return string
-     */
-    private function escapeCellFormat($cellFormat)
-    {
-        $ignoreUntil = '';
-        $escaped = '';
-        for ($i = 0, $ix = strlen($cellFormat); $i < $ix; $i++) {
-            $c = $cellFormat[$i];
-            if ($ignoreUntil == '' && $c == '[') {
-                $ignoreUntil = ']';
-            } else {
-                if ($ignoreUntil == '' && $c == '"') {
-                    $ignoreUntil = '"';
-                } else {
-                    if ($ignoreUntil == $c) {
-                        $ignoreUntil = '';
-                    }
-                }
-            }
-            if ($ignoreUntil == '' &&
-                ($c == ' ' || $c == '-' || $c == '(' || $c == ')') &&
-                ($i == 0 || $cellFormat[$i - 1] != '_')
-            ) {
-                $escaped .= "\\".$c;
-            } else {
-                $escaped .= $c;
-            }
-        }
-
-        return $escaped;
-    }
-
-    /**
      * backwards compatibility
      *
      * @param $cellFormat
@@ -292,7 +249,7 @@ class ExcelWriter
         $position = array_search($cellFormat, $this->cellFormats, $strict = true);
         if ($position === false) {
             $position = count($this->cellFormats);
-            $this->cellFormats[] = $this->escapeCellFormat($cellFormat);
+            $this->cellFormats[] = ExcelHelper::escapeCellFormat($cellFormat);
             $this->cellTypes[] = $this->determineCellType($cellFormat);
         }
 
@@ -311,7 +268,8 @@ class ExcelWriter
         $formatArray = [
             'string' => 'GENERAL',
             'integer' => '0',
-            'decimal' => '#,##0.00',
+            'float_with_sep' => '#,##0.00',
+            'float' => '0.00',
             'date' => 'YYYY-MM-DD',
             'datetime' => 'YYYY-MM-DD HH:MM:SS',
             'dollar' => '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00',

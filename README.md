@@ -39,7 +39,8 @@ to the require section of your `composer.json` file.
 ### Formats
 *   'string' = 'GENERAL'
 *   'integer' = '0'
-*   'decimal' = '#,##0.00'
+*   'float_with_sep' = '#,##0.00'
+*   'float' = '0.00'
 *   'date' = 'YYYY-MM-DD'
 *   'datetime' = 'YYYY-MM-DD HH:MM:SS'
 *   'dollar' = '[$$-1009]#,##0.00;[RED]-[$$-1009]#,##0.00'
