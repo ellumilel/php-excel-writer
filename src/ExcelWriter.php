@@ -101,11 +101,25 @@ class ExcelWriter
         return $filename;
     }
 
-    public function writeToStdOut()
+    /**
+     * @param bool $headers
+     */
+    public function writeToStdOut($headers = true)
     {
         $tempFile = $this->tempFilename();
         $this->writeToFile($tempFile);
-        readfile($tempFile);
+        if (file_exists($tempFile)) {
+            if ($headers) {
+                header('Content-Description: File Transfer');
+                header('Content-Type: application/octet-stream');
+                header('Content-Disposition: attachment; filename="'.basename($tempFile).'"');
+                header('Expires: 0');
+                header('Cache-Control: must-revalidate');
+                header('Pragma: public');
+                header('Content-Length: '.filesize($tempFile));
+            }
+            readfile($tempFile);
+        }
     }
 
     /**
