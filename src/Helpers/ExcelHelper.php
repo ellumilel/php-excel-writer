@@ -42,7 +42,7 @@ class ExcelHelper
         // check leapDay
         $leap = (new \DateTime($dateInput))->format('L');
         $mDays = [31, ($leap ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        if (($year < $epoch || $year > 9999) || ($month < 1 || $month > 12) || $day < 1 || $day > $mDays[$month - 1]) {
+        if (self::checkEpoch($year, $month, $day, $mDays[$month - 1])) {
             return 0;
         }
         $days = $day + ($range * 365) + array_sum(array_slice($mDays, 0, $month - 1));
@@ -53,6 +53,23 @@ class ExcelHelper
         }
 
         return $days + $seconds;
+    }
+
+    /**
+     * @param $year
+     * @param $month
+     * @param $day
+     * @param $dayCheck
+     *
+     * @return bool
+     */
+    private function checkEpoch($year, $month, $day, $dayCheck)
+    {
+        if (($year < 1900 || $year > 9999) || ($month < 1 || $month > 12) || $day < 1 || $day > $dayCheck) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
