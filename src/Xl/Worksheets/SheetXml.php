@@ -69,12 +69,21 @@ class SheetXml
     }
 
     /**
+     * @todo set colls width
+     *
      * @return string
      */
     public function getCools()
     {
+        /**
+        <cols>
+            <col width="11.42578125" max="3" min="1"/>
+            <col width="116" max="4" min="4" customWidth="1"/>
+            <col width="11.42578125" max="1025" min="5"/>
+        </cols>
+         */
         $sCols = '<cols>';
-        $sCols .= '<col collapsed="false" hidden="false" max="1025" min="1" style="0" width="11.5"/>';
+        $sCols .= '<col collapsed="false" hidden="false" max="7" min="1" style="0" width="30.5"/>';
         $sCols .= '</cols>';
 
         return $sCols;
