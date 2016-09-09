@@ -106,7 +106,7 @@ class ExcelWriter
      */
     public function writeToStdOut($headers = true)
     {
-        $tempFile = $this->tempFilename();
+        $tempFile = $this->tempFilename().'.xlsx';
         $this->writeToFile($tempFile);
         if (file_exists($tempFile)) {
             if ($headers) {
