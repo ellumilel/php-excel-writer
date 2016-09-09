@@ -9,6 +9,7 @@ $header = [
     'test4' => 'dollar',
     'test5' => 'float',
     'test6' => 'float_with_sep',
+    'test7' => 'string',
 ];
 $wExcel = new Ellumilel\ExcelWriter();
 $wExcel->setAuthor('Tester');
@@ -21,6 +22,7 @@ for ($j = 0; $j < 100; $j++) {
         rand(1000, 10000),
         rand(1000, 10000),
         rand(1000, 10000),
+        '=HYPERLINK("http://yandex.ru/asd'.rand(1000, 10000).'/sdf='.rand(1000, 10000).'","ссылка")',
     ]);
 }
 $wExcel->writeToFile("output_one.xlsx");
