@@ -24,14 +24,18 @@ class ExcelHelper
     {
         $epoch = 1900;
         $norm = 300;
-        $year = $month = $day = $offset = 0;
+        $year = $month = $day = $offset = $seconds = 0;
         $dateTime = $dateInput;
         if (preg_match("/(\d{4})\-(\d{2})\-(\d{2})/", $dateTime, $matches)) {
             $year = $matches[1];
             $month = $matches[2];
             $day = $matches[3];
         }
-        $seconds = self::getSeconds($dateTime);
+
+        if (preg_match("/(\d{2}):(\d{2}):(\d{2})/", $dateTime, $matches)) {
+            $seconds = ($matches[1] * 60 * 60 + $matches[2] * 60 + $matches[3]) / 86400;
+        }
+
         if ("$year-$month-$day" == '1899-12-31' || "$year-$month-$day" == '1900-01-00') {
             return $seconds;
         }
@@ -42,9 +46,11 @@ class ExcelHelper
         // check leapDay
         $leap = (new \DateTime($dateInput))->format('L');
         $mDays = [31, ($leap ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        if (self::checkEpoch($year, $month, $day, $mDays[$month - 1])) {
+
+        if (($year < 1900 || $year > 9999) || ($month < 1 || $month > 12) || $day < 1 || $day > $mDays[$month - 1]) {
             return 0;
         }
+
         $days = $day + ($range * 365) + array_sum(array_slice($mDays, 0, $month - 1));
         $days += intval(($range) / 4) - intval(($range + $offset) / 100);
         $days += intval(($range + $offset + $norm) / 400) - intval($leap);
@@ -53,23 +59,6 @@ class ExcelHelper
         }
 
         return $days + $seconds;
-    }
-
-    /**
-     * @param $year
-     * @param $month
-     * @param $day
-     * @param $dayCheck
-     *
-     * @return bool
-     */
-    private function checkEpoch($year, $month, $day, $dayCheck)
-    {
-        if (($year < 1900 || $year > 9999) || ($month < 1 || $month > 12) || $day < 1 || $day > $dayCheck) {
-            return true;
-        }
-
-        return false;
     }
 
     /**
@@ -150,21 +139,5 @@ class ExcelHelper
         }
 
         return $escaped;
-    }
-
-    /**
-     * @param $dateTime
-     *
-     * @return float|int
-     */
-    private function getSeconds($dateTime)
-    {
-        $seconds = 0;
-
-        if (preg_match("/(\d{2}):(\d{2}):(\d{2})/", $dateTime, $matches)) {
-            $seconds = ($matches[1] * 60 * 60 + $matches[2] * 60 + $matches[3]) / 86400;
-        }
-
-        return $seconds;
     }
 }
