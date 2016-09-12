@@ -33,6 +33,8 @@ class ExcelWriter
     protected $currentSheet = '';
     /** @var null */
     protected $tmpDir = null;
+    /** @var null */
+    protected $fileName = null;
     /** @var Core */
     protected $core;
     /** @var App */
@@ -89,6 +91,16 @@ class ExcelWriter
     }
 
     /**
+     * Set output filename: yourFileName.xlsx
+     *
+     * @param string $fileName
+     */
+    public function setFileName($fileName)
+    {
+        $this->fileName = $fileName;
+    }
+
+    /**
      * Return tmpFileName
      * @return string
      */
@@ -106,7 +118,12 @@ class ExcelWriter
      */
     public function writeToStdOut($headers = true)
     {
-        $tempFile = $this->tempFilename().'.xlsx';
+        if (empty($this->tmpDir)) {
+            $tempFile = $this->tempFilename().'.xlsx';
+        } else {
+            $tempFile = $this->fileName;
+        }
+
         $this->writeToFile($tempFile);
         if (file_exists($tempFile)) {
             if ($headers) {
