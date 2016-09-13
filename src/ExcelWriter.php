@@ -236,6 +236,9 @@ class ExcelWriter
         if ($cellFormat == '0') {
             return 'numeric';
         }
+        if ($cellFormat == '@') {
+            return '@';
+        }
         $checkArray = [
             'datetime' => [
                 "/[H]{1,2}:[M]{1,2}/",
@@ -298,6 +301,7 @@ class ExcelWriter
     {
         $formatArray = [
             'string' => 'GENERAL',
+            'text' => '@',
             'integer' => '0',
             'float_with_sep' => '#,##0.00',
             'float' => '0.00',
