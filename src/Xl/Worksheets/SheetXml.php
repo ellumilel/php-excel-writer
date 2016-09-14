@@ -171,6 +171,10 @@ class SheetXml
      */
     public function getCell($cellName, $cellIndex, $cellType, $value)
     {
+        if ($cellType == '@') {
+            return false;
+        }
+
         if (!is_scalar($value) || $value === '') {
             return '<c r="'.$cellName.'" s="'.$cellIndex.'"/>';
         }

@@ -32,12 +32,13 @@ php composer.phar require --prefer-dist ellumilel/php-excel-writer
 or add
 
 ```
-"ellumilel/php-excel-writer": ">=0.1.1"
+"ellumilel/php-excel-writer": ">=0.1.3"
 ```
 
 to the require section of your `composer.json` file.
 ### Formats
 *   'string' = 'GENERAL'
+*   'text' = '@'
 *   'integer' = '0'
 *   'float_with_sep' = '#,##0.00'
 *   'float' = '0.00'
@@ -89,7 +90,7 @@ $header = [
     'head5' => 'string',
     'head6' => 'string',
     'head7' => 'string',
-    'head8' => 'string',
+    'head8' => 'text',
 ];
 $wExcel = new Ellumilel\ExcelWriter();
 $wExcel->setAuthor('BigData Tester');
