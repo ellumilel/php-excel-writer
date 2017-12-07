@@ -107,7 +107,7 @@ class ExcelWriter
     protected function tempFilename()
     {
         $tmpDir = is_null($this->tmpDir) ? sys_get_temp_dir() : $this->tmpDir;
-        $filename = tempnam($tmpDir, "excelWriter_");
+        $filename = @tempnam($tmpDir, "excelWriter_");
         $this->tempFiles[] = $filename;
 
         return $filename;
