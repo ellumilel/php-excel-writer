@@ -7,6 +7,7 @@ Excel spreadsheet in with (Office 2007+) xlsx format, with just basic features
 [![Build Status](https://travis-ci.org/ellumilel/php-excel-writer.svg?branch=master)](http://travis-ci.org/ellumilel/php-excel-writer)
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/ellumilel/php-excel-writer/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/ellumilel/php-excel-writer/?branch=master)
 [![License](https://poser.pugx.org/ellumilel/php-excel-writer/license)](https://packagist.org/packages/ellumilel/php-excel-writer)
+[![Total Downloads](https://poser.pugx.org/ellumilel/php-excel-writer/downloads)](https://packagist.org/packages/ellumilel/php-excel-writer)
 ### Use:
 - `ZipArchive`, based on PHP's [Zip extension](http://fr.php.net/manual/en/book.zip.php)
 
