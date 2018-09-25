@@ -253,7 +253,7 @@ class SheetXml
      */
     private function getIntCell($cellName, $cellIndex, $value)
     {
-        return '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.($value * 1).'</v></c>';
+        return '<c r="'.$cellName.'" s="'.$cellIndex.'" t="n"><v>'.intval($value).'</v></c>';
     }
 
     /**
