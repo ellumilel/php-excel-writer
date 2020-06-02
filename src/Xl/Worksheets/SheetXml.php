@@ -69,12 +69,21 @@ class SheetXml
     }
 
     /**
+     * @todo set colls width
+     *
      * @return string
      */
     public function getCools()
     {
+        /**
+        <cols>
+            <col width="11.42578125" max="3" min="1"/>
+            <col width="116" max="4" min="4" customWidth="1"/>
+            <col width="11.42578125" max="1025" min="5"/>
+        </cols>
+         */
         $sCols = '<cols>';
-        $sCols .= '<col collapsed="false" hidden="false" max="1025" min="1" style="0" width="11.5"/>';
+        $sCols .= '<col collapsed="false" hidden="false" max="7" min="1" style="0" width="30.5"/>';
         $sCols .= '</cols>';
 
         return $sCols;
@@ -170,7 +179,7 @@ class SheetXml
             return '<c r="'.$cellName.'" s="'.$cellIndex.'"/>';
         }
 
-        if (is_string($value) && $value{0} == '=') {
+        if (is_string($value) && $value[0] == '=') {
             return $this->getFormulaCell($cellName, $cellIndex, $value);
         }
 
@@ -195,8 +204,8 @@ class SheetXml
         if (!is_string($value)) {
             return $this->getIntCell($cellName, $cellIndex, $value);
         } else {
-            if ($value{0} != '0' &&
-                $value{0} != '+' &&
+            if ($value[0] != '0' &&
+                $value[0] != '+' &&
                 filter_var(
                     $value,
                     FILTER_VALIDATE_INT,
