@@ -2,7 +2,7 @@
 <phpunit>
     <testsuites>
         <testsuite name="XLSX">
-            <directory>./XLSX/</directory>
+            <file>./XLSX/XLSXtest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
